@@ -137,6 +137,8 @@ async def check_once(bot: Bot, state: dict) -> None:
         log.warning("Ошибка запроса к API: %s", e)
         return
 
+    any_event = False
+
     for tx in txs:
         txid = tx["txid"]
         incoming, sats = tx_is_incoming(tx, BTC_ADDRESS)
@@ -154,6 +156,7 @@ async def check_once(bot: Bot, state: dict) -> None:
         # Новая транзакция — первое обнаружение
         if txid not in state["notified_seen"]:
             state["notified_seen"].append(txid)
+            any_event = True
             eta = estimate_wait_time(tx, fees) if not confirmed else "—"
             await send_telegram_message(
                 bot,
@@ -168,6 +171,7 @@ async def check_once(bot: Bot, state: dict) -> None:
         # Уже видели раньше, но всё ещё не подтверждена — напоминание
         # с актуальной оценкой времени ожидания (проверка раз в 5 минут по cron)
         elif not confirmed and txid not in state["notified_confirmed"]:
+            any_event = True
             eta = estimate_wait_time(tx, fees)
             await send_telegram_message(
                 bot,
@@ -185,6 +189,7 @@ async def check_once(bot: Bot, state: dict) -> None:
             and txid not in state["notified_confirmed"]
         ):
             state["notified_confirmed"].append(txid)
+            any_event = True
             await send_telegram_message(
                 bot,
                 f"✅ <b>Транзакция подтверждена!</b>\n"
@@ -193,6 +198,10 @@ async def check_once(bot: Bot, state: dict) -> None:
                 f'<a href="{tx_url}">Посмотреть на mempool.space</a>',
             )
             log.info("Tx %s подтверждена (%d confirmations)", txid, confirmations)
+
+    if not any_event:
+        await send_telegram_message(bot, "ℹ️ Новых транзакций нет.")
+        log.info("Новых событий не найдено")
 
     save_state(state)
 
