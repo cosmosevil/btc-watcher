@@ -117,6 +117,8 @@ async def check_once(bot: Bot, state: dict) -> None:
 
         btc_amount = sats / 1e8
 
+        tx_url = f"https://mempool.space/tx/{txid}"
+
         # Уведомление о новой (ещё неподтверждённой) транзакции
         if txid not in state["notified_seen"]:
             state["notified_seen"].append(txid)
@@ -124,7 +126,7 @@ async def check_once(bot: Bot, state: dict) -> None:
                 bot,
                 f"🟡 <b>Новая входящая транзакция замечена</b>\n"
                 f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
-                f"TxID: <code>{txid}</code>\n"
+                f'<a href="{tx_url}">Посмотреть на mempool.space</a>\n'
                 f"Статус: в мемпуле, ждём подтверждения...",
             )
             log.info("Новая входящая tx %s на %.8f BTC", txid, btc_amount)
@@ -141,7 +143,7 @@ async def check_once(bot: Bot, state: dict) -> None:
                 f"✅ <b>Транзакция подтверждена!</b>\n"
                 f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
                 f"Подтверждений: {confirmations}\n"
-                f"TxID: <code>{txid}</code>",
+                f'<a href="{tx_url}">Посмотреть на mempool.space</a>',
             )
             log.info("Tx %s подтверждена (%d confirmations)", txid, confirmations)
 
