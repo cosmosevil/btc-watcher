@@ -71,8 +71,40 @@ def get_current_block_height() -> int:
     return int(r.text)
 
 
+def get_recommended_fees() -> dict:
+    """fastestFee/halfHourFee/hourFee/economyFee/minimumFee, в sat/vB."""
+    r = requests.get(f"{API_BASE}/v1/fees/recommended", timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def estimate_wait_time(tx: dict, fees: dict) -> str:
+    """Грубая оценка времени до первого подтверждения по fee rate транзакции.
+    Это эвристика на основе текущих рекомендуемых комиссий mempool.space,
+    точное время предсказать невозможно — зависит от загрузки сети."""
+    fee_sats = tx.get("fee")
+    weight = tx.get("weight")
+    if not fee_sats or not weight:
+        return "не удалось оценить (нет данных о комиссии)"
+
+    vsize = weight / 4
+    fee_rate = fee_sats / vsize  # sat/vB
+
+    if fee_rate >= fees.get("fastestFee", 999999):
+        return "~10 минут (следующий блок)"
+    elif fee_rate >= fees.get("halfHourFee", 999999):
+        return "~30 минут"
+    elif fee_rate >= fees.get("hourFee", 999999):
+        return "~1 час"
+    elif fee_rate >= fees.get("economyFee", 999999):
+        return "несколько часов"
+    else:
+        return "комиссия низкая, может занять очень долго (часы-дни)"
+
+
 def get_address_txs(address: str) -> list[dict]:
-    """Возвращает список транзакций (включая mempool) по адресу."""
+    """Возвращает список транзакций (включая mempool) по адресу.
+    mempool.space отдаёт их в порядке от самой новой к самой старой."""
     r = requests.get(f"{API_BASE}/address/{address}/txs", timeout=15)
     r.raise_for_status()
     return r.json()
@@ -100,6 +132,7 @@ async def check_once(bot: Bot, state: dict) -> None:
     try:
         height = get_current_block_height()
         txs = get_address_txs(BTC_ADDRESS)
+        fees = get_recommended_fees()
     except requests.RequestException as e:
         log.warning("Ошибка запроса к API: %s", e)
         return
@@ -116,18 +149,19 @@ async def check_once(bot: Bot, state: dict) -> None:
         confirmations = (height - block_height + 1) if confirmed and block_height else 0
 
         btc_amount = sats / 1e8
-
         tx_url = f"https://mempool.space/tx/{txid}"
 
         # Уведомление о новой (ещё неподтверждённой) транзакции
         if txid not in state["notified_seen"]:
             state["notified_seen"].append(txid)
+            eta = estimate_wait_time(tx, fees) if not confirmed else "—"
             await send_telegram_message(
                 bot,
                 f"🟡 <b>Новая входящая транзакция замечена</b>\n"
                 f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
                 f'<a href="{tx_url}">Посмотреть на mempool.space</a>\n'
-                f"Статус: в мемпуле, ждём подтверждения...",
+                f"Статус: в мемпуле, ждём подтверждения...\n"
+                f"Примерное время ожидания: {eta}",
             )
             log.info("Новая входящая tx %s на %.8f BTC", txid, btc_amount)
 
