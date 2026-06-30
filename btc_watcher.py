@@ -151,7 +151,7 @@ async def check_once(bot: Bot, state: dict) -> None:
         btc_amount = sats / 1e8
         tx_url = f"https://mempool.space/tx/{txid}"
 
-        # Уведомление о новой (ещё неподтверждённой) транзакции
+        # Новая транзакция — первое обнаружение
         if txid not in state["notified_seen"]:
             state["notified_seen"].append(txid)
             eta = estimate_wait_time(tx, fees) if not confirmed else "—"
@@ -164,6 +164,19 @@ async def check_once(bot: Bot, state: dict) -> None:
                 f"Примерное время ожидания: {eta}",
             )
             log.info("Новая входящая tx %s на %.8f BTC", txid, btc_amount)
+
+        # Уже видели раньше, но всё ещё не подтверждена — напоминание
+        # с актуальной оценкой времени ожидания (проверка раз в 5 минут по cron)
+        elif not confirmed and txid not in state["notified_confirmed"]:
+            eta = estimate_wait_time(tx, fees)
+            await send_telegram_message(
+                bot,
+                f"⏳ <b>Транзакция всё ещё не подтверждена</b>\n"
+                f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
+                f'<a href="{tx_url}">Посмотреть на mempool.space</a>\n'
+                f"Примерное время ожидания: {eta}",
+            )
+            log.info("Tx %s всё ещё в мемпуле, ETA: %s", txid, eta)
 
         # Уведомление о подтверждении
         if (

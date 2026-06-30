@@ -2,11 +2,12 @@
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
-  workflow_dispatch: {}
+    # Каждые 5 минут. Синтаксис cron как обычно: минута час день месяц день_недели
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}  # позволяет запускать вручную из вкладки Actions
 
 permissions:
-  contents: write
+  contents: write  # нужно, чтобы воркфлоу мог закоммитить файл состояния
 
 jobs:
   check:
