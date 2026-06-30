@@ -2,15 +2,18 @@
 """
 BTC Wallet Watcher -> Telegram Notifier
 
-Опрашивает mempool.space API по заданному BTC-адресу и присылает
-сообщение в Telegram, когда появляется новая входящая транзакция
-и когда она набирает нужное число подтверждений.
+Делает ОДНУ проверку BTC-адреса через mempool.space API и шлёт
+сообщение в Telegram, если найдена новая входящая транзакция или
+если ранее увиденная транзакция набрала нужное число подтверждений.
 
-Настройка:
-  1. Создайте бота у @BotFather, получите TELEGRAM_BOT_TOKEN.
-  2. Узнайте свой chat_id (например, через @userinfobot) -> TELEGRAM_CHAT_ID.
-  3. Укажите BTC_ADDRESS — адрес кошелька, который отслеживаем.
-  4. Запустите: python3 btc_watcher.py
+Предполагается, что скрипт запускается периодически снаружи —
+например, через GitHub Actions по расписанию (cron).
+
+Состояние (какие tx уже видели/подтвердили) хранится в JSON-файле
+рядом со скриптом и коммитится обратно в репозиторий workflow'ом.
+
+Переменные окружения:
+  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, BTC_ADDRESS
 
 Зависимости: requests, python-telegram-bot
   pip install requests python-telegram-bot --break-system-packages
@@ -35,16 +38,8 @@ BTC_ADDRESS = os.environ.get("BTC_ADDRESS", "ВАШ_BTC_АДРЕС")
 # Сколько подтверждений считать "подтверждённой" транзакцией
 REQUIRED_CONFIRMATIONS = 1
 
-# Как часто опрашивать API (в секундах)
-POLL_INTERVAL = 90
-
-# Файл, где храним состояние уже обработанных tx, чтобы не дублировать
-# уведомления и переживать перезапуск скрипта.
-# На Fly.io указываем STATE_FILE_DIR=/data и монтируем туда volume,
-# чтобы состояние переживало рестарты контейнера.
-STATE_DIR = Path(os.environ.get("STATE_FILE_DIR", "."))
-STATE_DIR.mkdir(parents=True, exist_ok=True)
-STATE_FILE = STATE_DIR / "btc_watcher_state.json"
+# Файл состояния — лежит в репозитории, коммитится обратно после каждого запуска
+STATE_FILE = Path(os.environ.get("STATE_FILE", "btc_watcher_state.json"))
 
 # mempool.space — бесплатный публичный API, без ключа
 API_BASE = "https://mempool.space/api"
@@ -60,7 +55,9 @@ log = logging.getLogger("btc_watcher")
 
 def load_state() -> dict:
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+        # encoding="utf-8-sig" корректно съедает BOM, если он есть
+        # (например, если файл был сохранён через PowerShell Out-File -Encoding utf8)
+        return json.loads(STATE_FILE.read_text(encoding="utf-8-sig"))
     return {"notified_seen": [], "notified_confirmed": []}
 
 
@@ -155,18 +152,16 @@ async def main() -> None:
     if "ВАШ_" in TELEGRAM_BOT_TOKEN or "ВАШ_" in TELEGRAM_CHAT_ID or "ВАШ_" in BTC_ADDRESS:
         log.error(
             "Заполните TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID и BTC_ADDRESS "
-            "(через переменные окружения или прямо в коде)."
+            "(через переменные окружения)."
         )
         return
 
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     state = load_state()
 
-    log.info("Запуск мониторинга адреса %s, опрос каждые %d сек.", BTC_ADDRESS, POLL_INTERVAL)
-
-    while True:
-        await check_once(bot, state)
-        await asyncio.sleep(POLL_INTERVAL)
+    log.info("Проверка адреса %s (одноразовый запуск)", BTC_ADDRESS)
+    await check_once(bot, state)
+    log.info("Проверка завершена")
 
 
 if __name__ == "__main__":
