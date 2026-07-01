@@ -2,8 +2,8 @@ name: Daily BTC summary
 
 on:
   schedule:
-    # Каждый день в 09:00 UTC (12:00 МСК)
-    - cron: "0 9 * * *"
+    # Каждый день в 20:59 UTC (23:59 МСК)
+    - cron: "59 20 * * *"
   workflow_dispatch: {}  # можно запустить вручную для теста
 
 permissions:
