@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -57,8 +58,15 @@ def load_state() -> dict:
     if STATE_FILE.exists():
         # encoding="utf-8-sig" корректно съедает BOM, если он есть
         # (например, если файл был сохранён через PowerShell Out-File -Encoding utf8)
-        return json.loads(STATE_FILE.read_text(encoding="utf-8-sig"))
-    return {"notified_seen": [], "notified_confirmed": []}
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8-sig"))
+    else:
+        state = {}
+    # Гарантируем наличие всех полей (для обратной совместимости со старым state)
+    state.setdefault("notified_seen", [])
+    state.setdefault("notified_confirmed", [])
+    # daily_confirmed: список {"txid": ..., "sats": ..., "confirmed_at": unix_timestamp}
+    state.setdefault("daily_confirmed", [])
+    return state
 
 
 def save_state(state: dict) -> None:
@@ -102,6 +110,35 @@ def estimate_wait_time(tx: dict, fees: dict) -> str:
         return "комиссия низкая, может занять очень долго (часы-дни)"
 
 
+def get_btc_price() -> dict:
+    """Получает текущий курс BTC в USD и RUB через CoinGecko API (бесплатно, без ключа)."""
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "bitcoin", "vs_currencies": "usd,rub"},
+            timeout=15,
+        )
+        r.raise_for_status()
+        data = r.json()
+        return {
+            "usd": data["bitcoin"]["usd"],
+            "rub": data["bitcoin"]["rub"],
+        }
+    except Exception as e:
+        log.warning("Не удалось получить курс BTC: %s", e)
+        return {}
+
+
+def format_price(btc_amount: float, price: dict) -> str:
+    """Форматирует сумму в BTC + эквивалент в USD и RUB."""
+    result = f"{btc_amount:.8f} BTC"
+    if price.get("usd") and price.get("rub"):
+        usd = btc_amount * price["usd"]
+        rub = btc_amount * price["rub"]
+        result += f" (~${usd:,.2f} / ~₽{rub:,.0f})"
+    return result
+
+
 def get_address_txs(address: str) -> list[dict]:
     """Возвращает список транзакций (включая mempool) по адресу.
     mempool.space отдаёт их в порядке от самой новой к самой старой."""
@@ -133,6 +170,7 @@ async def check_once(bot: Bot, state: dict) -> None:
         height = get_current_block_height()
         txs = get_address_txs(BTC_ADDRESS)
         fees = get_recommended_fees()
+        price = get_btc_price()
     except requests.RequestException as e:
         log.warning("Ошибка запроса к API: %s", e)
         return
@@ -152,6 +190,7 @@ async def check_once(bot: Bot, state: dict) -> None:
 
         btc_amount = sats / 1e8
         tx_url = f"https://mempool.space/tx/{txid}"
+        amount_str = format_price(btc_amount, price)
 
         # Новая транзакция — первое обнаружение
         if txid not in state["notified_seen"]:
@@ -161,7 +200,7 @@ async def check_once(bot: Bot, state: dict) -> None:
             await send_telegram_message(
                 bot,
                 f"🟡 <b>Новая входящая транзакция замечена</b>\n"
-                f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
+                f"Сумма: <b>{amount_str}</b>\n"
                 f'<a href="{tx_url}">Посмотреть на mempool.space</a>\n'
                 f"Статус: в мемпуле, ждём подтверждения...\n"
                 f"Примерное время ожидания: {eta}",
@@ -169,14 +208,13 @@ async def check_once(bot: Bot, state: dict) -> None:
             log.info("Новая входящая tx %s на %.8f BTC", txid, btc_amount)
 
         # Уже видели раньше, но всё ещё не подтверждена — напоминание
-        # с актуальной оценкой времени ожидания (проверка раз в 5 минут по cron)
         elif not confirmed and txid not in state["notified_confirmed"]:
             any_event = True
             eta = estimate_wait_time(tx, fees)
             await send_telegram_message(
                 bot,
                 f"⏳ <b>Транзакция всё ещё не подтверждена</b>\n"
-                f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
+                f"Сумма: <b>{amount_str}</b>\n"
                 f'<a href="{tx_url}">Посмотреть на mempool.space</a>\n'
                 f"Примерное время ожидания: {eta}",
             )
@@ -190,10 +228,16 @@ async def check_once(bot: Bot, state: dict) -> None:
         ):
             state["notified_confirmed"].append(txid)
             any_event = True
+            # Записываем в историю для ежедневной сводки
+            state["daily_confirmed"].append({
+                "txid": txid,
+                "sats": sats,
+                "confirmed_at": int(datetime.now(timezone.utc).timestamp()),
+            })
             await send_telegram_message(
                 bot,
                 f"✅ <b>Транзакция подтверждена!</b>\n"
-                f"Сумма: <b>{btc_amount:.8f} BTC</b>\n"
+                f"Сумма: <b>{amount_str}</b>\n"
                 f"Подтверждений: {confirmations}\n"
                 f'<a href="{tx_url}">Посмотреть на mempool.space</a>',
             )
@@ -204,6 +248,45 @@ async def check_once(bot: Bot, state: dict) -> None:
         log.info("Новых событий не найдено")
 
     save_state(state)
+
+
+async def daily_summary(bot: Bot, state: dict) -> None:
+    """Отправляет итоговую сводку за последние 24 часа."""
+    now = int(datetime.now(timezone.utc).timestamp())
+    since = now - 86400  # 24 часа назад
+
+    # Фильтруем транзакции за последние сутки
+    recent = [tx for tx in state.get("daily_confirmed", []) if tx["confirmed_at"] >= since]
+
+    price = get_btc_price()
+    date_str = datetime.now(timezone.utc).strftime("%d.%m.%Y")
+
+    if not recent:
+        await send_telegram_message(
+            bot,
+            f"📅 <b>Сводка за {date_str}</b>\n\n"
+            f"За последние 24 часа входящих транзакций не было.",
+        )
+        log.info("Ежедневная сводка: транзакций не было")
+        return
+
+    total_sats = sum(tx["sats"] for tx in recent)
+    total_btc = total_sats / 1e8
+    count = len(recent)
+    amount_str = format_price(total_btc, price)
+
+    lines = [f"📅 <b>Сводка за {date_str}</b>\n"]
+    lines.append(f"Транзакций получено: <b>{count}</b>")
+    lines.append(f"Итого: <b>{amount_str}</b>\n")
+    lines.append("<b>Детали:</b>")
+    for i, tx in enumerate(recent, 1):
+        btc = tx["sats"] / 1e8
+        tx_url = f"https://mempool.space/tx/{tx['txid']}"
+        time_str = datetime.fromtimestamp(tx["confirmed_at"], tz=timezone.utc).strftime("%H:%M UTC")
+        lines.append(f"{i}. <a href=\"{tx_url}\">{btc:.8f} BTC</a> в {time_str}")
+
+    await send_telegram_message(bot, "\n".join(lines))
+    log.info("Ежедневная сводка отправлена: %d tx, %.8f BTC", count, total_btc)
 
 
 async def main() -> None:
@@ -217,9 +300,13 @@ async def main() -> None:
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     state = load_state()
 
-    log.info("Проверка адреса %s (одноразовый запуск)", BTC_ADDRESS)
-    await check_once(bot, state)
-    log.info("Проверка завершена")
+    if os.environ.get("DAILY_SUMMARY") == "true":
+        log.info("Режим: ежедневная сводка")
+        await daily_summary(bot, state)
+    else:
+        log.info("Проверка адреса %s (одноразовый запуск)", BTC_ADDRESS)
+        await check_once(bot, state)
+        log.info("Проверка завершена")
 
 
 if __name__ == "__main__":
