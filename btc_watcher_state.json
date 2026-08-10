@@ -71,7 +71,8 @@
     "38d4e8659ab54fbe0662ae3af2fe70c2b5a3c960d5cab174fcf77ed0cf51a43f",
     "f21de93c6964135d0efc9416ec85d1c97a0c96b0da5fdf8ee88cebafcc2027c0",
     "d00a95dd1ba75707f0726c1f7ce58ac4e3616017783af7001200f4a8c4b31d48",
-    "46ec6e0a60d6e5c921b3fb8db512c92d58d0577b32a8a23a3ef3c59d3efa3ff8"
+    "46ec6e0a60d6e5c921b3fb8db512c92d58d0577b32a8a23a3ef3c59d3efa3ff8",
+    "08fd7a79c6a763244b57586b6c63d04dc3a19ba4c43aefcc3d165105034db457"
   ],
   "notified_confirmed": [
     "2169b813deb4bfc0d176783b559ca3cebed6b010900beb34c68f9d81ca6a3e9c",
@@ -145,7 +146,8 @@
     "38d4e8659ab54fbe0662ae3af2fe70c2b5a3c960d5cab174fcf77ed0cf51a43f",
     "f21de93c6964135d0efc9416ec85d1c97a0c96b0da5fdf8ee88cebafcc2027c0",
     "d00a95dd1ba75707f0726c1f7ce58ac4e3616017783af7001200f4a8c4b31d48",
-    "46ec6e0a60d6e5c921b3fb8db512c92d58d0577b32a8a23a3ef3c59d3efa3ff8"
+    "46ec6e0a60d6e5c921b3fb8db512c92d58d0577b32a8a23a3ef3c59d3efa3ff8",
+    "08fd7a79c6a763244b57586b6c63d04dc3a19ba4c43aefcc3d165105034db457"
   ],
   "daily_confirmed": [
     {
@@ -357,6 +359,11 @@
       "txid": "46ec6e0a60d6e5c921b3fb8db512c92d58d0577b32a8a23a3ef3c59d3efa3ff8",
       "sats": 19033,
       "confirmed_at": 1786304626
+    },
+    {
+      "txid": "08fd7a79c6a763244b57586b6c63d04dc3a19ba4c43aefcc3d165105034db457",
+      "sats": 51144,
+      "confirmed_at": 1786351594
     }
   ]
 }
