@@ -162,7 +162,8 @@
     "988c7b8e00e6c5c7ece33a683df9e2b53c4678adaaac3789cd8e974d143a617c",
     "5fb90f621da9c0d4ba00618f00a7cae386a57ecde04fb83192315cd7f6e1b61d",
     "c061af90cdd4cde54c26a2540f40233d0eef36eea0cbbaebbc3cc5a778770e27",
-    "4cbfd120e7f59007dc25663e914a7032ae6898c9fb6aec24cde6606b312e2505"
+    "4cbfd120e7f59007dc25663e914a7032ae6898c9fb6aec24cde6606b312e2505",
+    "d34ff36291df857a9a6d30cda9f7afed5d4de09c7956d75e8da82ca53c825633"
   ],
   "daily_confirmed": [
     {
@@ -414,6 +415,11 @@
       "txid": "4cbfd120e7f59007dc25663e914a7032ae6898c9fb6aec24cde6606b312e2505",
       "sats": 78658,
       "confirmed_at": 1787305846
+    },
+    {
+      "txid": "d34ff36291df857a9a6d30cda9f7afed5d4de09c7956d75e8da82ca53c825633",
+      "sats": 35648,
+      "confirmed_at": 1787346008
     }
   ]
 }
