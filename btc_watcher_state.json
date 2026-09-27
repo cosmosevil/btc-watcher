@@ -122,7 +122,9 @@
     "880a68f2b3bc9cc09cc3f161207526c400e15398e9faebaf09ee800a4e458f64",
     "c711aee522ca2c11816447467f6ca0c5d5c8826f1c3be77a08c7d68e5a8e463d",
     "4e508d61dfdcf89b66bd59c8e09ecb6c46a3baa6ebd27ed8ec0224508fd9fbc6",
-    "7861adadc3b98af0a683ee20d6aac72cee9fa1cba501ef7d1e759039a8d0ef8d"
+    "7861adadc3b98af0a683ee20d6aac72cee9fa1cba501ef7d1e759039a8d0ef8d",
+    "5ad887d48850677a342b350cf2e4fc38fc1dbf454ebf8a2b530bb922a31e252f",
+    "2e910c0c9a47fc5dfede318f41f0dc937eb8d76011c88332c1fd2571b37ee060"
   ],
   "notified_confirmed": [
     "2169b813deb4bfc0d176783b559ca3cebed6b010900beb34c68f9d81ca6a3e9c",
@@ -247,7 +249,9 @@
     "880a68f2b3bc9cc09cc3f161207526c400e15398e9faebaf09ee800a4e458f64",
     "c711aee522ca2c11816447467f6ca0c5d5c8826f1c3be77a08c7d68e5a8e463d",
     "4e508d61dfdcf89b66bd59c8e09ecb6c46a3baa6ebd27ed8ec0224508fd9fbc6",
-    "7861adadc3b98af0a683ee20d6aac72cee9fa1cba501ef7d1e759039a8d0ef8d"
+    "7861adadc3b98af0a683ee20d6aac72cee9fa1cba501ef7d1e759039a8d0ef8d",
+    "5ad887d48850677a342b350cf2e4fc38fc1dbf454ebf8a2b530bb922a31e252f",
+    "2e910c0c9a47fc5dfede318f41f0dc937eb8d76011c88332c1fd2571b37ee060"
   ],
   "daily_confirmed": [
     {
@@ -714,6 +718,16 @@
       "txid": "7861adadc3b98af0a683ee20d6aac72cee9fa1cba501ef7d1e759039a8d0ef8d",
       "sats": 35697,
       "confirmed_at": 1790447626
+    },
+    {
+      "txid": "5ad887d48850677a342b350cf2e4fc38fc1dbf454ebf8a2b530bb922a31e252f",
+      "sats": 27379,
+      "confirmed_at": 1790530745
+    },
+    {
+      "txid": "2e910c0c9a47fc5dfede318f41f0dc937eb8d76011c88332c1fd2571b37ee060",
+      "sats": 28377,
+      "confirmed_at": 1790530746
     }
   ]
 }
